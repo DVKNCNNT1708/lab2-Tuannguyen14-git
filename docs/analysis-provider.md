@@ -1,11 +1,11 @@
 # Phân tích yêu cầu — vai Provider
 
-- Cặp đàm phán:
-- Product: A / B
-- Provider service:
-- Consumer service:
-- Người viết:
-- Ngày:
+- Cặp đàm phán: Pair 10 — Access Gate ↔ Core Business
+- Product: A3
+- Provider service: Core Business
+- Consumer service: Access Gate
+- Người viết: Bui Trung Quan
+- Ngày: 13/05/2026
 
 ---
 
@@ -13,8 +13,8 @@
 
 | Resource | Mô tả | Thuộc tính bắt buộc | Thuộc tính tùy chọn |
 |---|---|---|---|
-| `<Resource 1>` |  |  |  |
-| `<Resource 2>` |  |  |  |
+| AccessDecision | Kết quả kiểm tra quyền ra/vào | decisionId, decision, reasonCode, policyId | expiresAt |
+| AccessPolicy | Chính sách kiểm soát truy cập | policyId, policyName, active | createdAt |
 
 ---
 
@@ -22,8 +22,10 @@
 
 | Method | Path | Mục đích | Consumer gọi khi nào? |
 |---|---|---|---|
-| POST | `/...` |  |  |
-| GET | `/.../{id}` |  |  |
+| POST | `/access/check` | Kiểm tra quyền ra/vào realtime | Khi người dùng quẹt thẻ tại cổng |
+| GET | `/policies/access/{policyId}` | Lấy thông tin policy | Khi cần kiểm tra hoặc audit policy |
+| GET | `/decisions/{decisionId}` | Lấy lịch sử quyết định truy cập | Khi cần tra cứu log |
+| GET | `/health` | Kiểm tra trạng thái service | Khi monitoring hệ thống |
 
 ---
 
@@ -36,9 +38,9 @@ Tối thiểu 5 case.
 | 400 | Payload sai định dạng | `Problem` |
 | 401 | Thiếu Bearer token | `Problem` |
 | 403 | Token hợp lệ nhưng không có quyền | `Problem` |
-| 404 | Resource không tồn tại | `Problem` |
-| 409 | Xung đột nghiệp vụ | `Problem` |
-| 422 | Dữ liệu đúng JSON nhưng vi phạm nghiệp vụ | `Problem` |
+| 404 | Policy hoặc decision không tồn tại | `Problem` |
+| 409 | Request bị duplicate | `Problem` |
+| 422 | Card bị khóa hoặc policy hết hạn | `Problem` |
 
 ---
 
@@ -46,17 +48,17 @@ Tối thiểu 5 case.
 
 Ghi rõ những điểm user story chưa nói nhưng Provider cần giả định.
 
-- Giả định 1:
-- Giả định 2:
-- Giả định 3:
+- Giả định 1: Access Gate luôn gửi timestamp theo chuẩn ISO 8601.
+- Giả định 2: Mỗi request có thể có idempotencyKey để tránh xử lý lặp.
+- Giả định 3: Provider chỉ trả về ALLOW hoặc DENY.
 
 ---
 
 ## 5. Câu hỏi cho Consumer
 
-1. 
-2. 
-3. 
+1. Timeout tối đa cho `/access/check` là bao nhiêu mili giây?
+2. Khi Core Business lỗi thì Gate fail-open hay fail-closed?
+3. Có cần lưu lịch sử access decision bao lâu không?
 
 ---
 
@@ -66,3 +68,6 @@ Ghi rõ những điểm user story chưa nói nhưng Provider cần giả địn
 |---|---|---|
 | Tên field không thống nhất | Consumer parse lỗi | Chốt naming trong `openapi.yaml` |
 | Payload lớn | Timeout/mock lỗi | Thống nhất content-type và size limit |
+| Clock lệch giữa 2 service | Sai expiresAt | Đồng bộ timezone UTC |
+| Retry request nhiều lần | Duplicate decision | Dùng idempotencyKey |
+| Policy schema thay đổi | Consumer parse lỗi | Dùng versioning API |

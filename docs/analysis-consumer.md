@@ -1,11 +1,11 @@
 # Phân tích yêu cầu — vai Consumer
 
-- Cặp đàm phán:
-- Product: A / B
-- Consumer service:
-- Provider service:
-- Người viết:
-- Ngày:
+- Cặp đàm phán: Pair 10 — Access Gate ↔ Core Business
+- Product: A3
+- Consumer service: Access Gate
+- Provider service: Core Business
+- Người viết: Bui Trung Quan
+- Ngày: 13/05/2026
 
 ---
 
@@ -13,8 +13,8 @@
 
 | Resource | Consumer dùng để làm gì? | Field bắt buộc với Consumer | Field có thể tùy chọn |
 |---|---|---|---|
-| `<Resource 1>` |  |  |  |
-| `<Resource 2>` |  |  |  |
+| AccessCheckRequest | Gửi thông tin quẹt thẻ để kiểm tra quyền truy cập | cardId, gateId, timestamp, direction | idempotencyKey |
+| AccessDecision | Nhận kết quả kiểm tra quyền truy cập | decision, reasonCode, policyId | expiresAt, policyDetail |
 
 ---
 
@@ -22,8 +22,10 @@
 
 | Method | Path | Lúc nào gọi? | Kỳ vọng response |
 |---|---|---|---|
-| POST | `/...` |  |  |
-| GET | `/.../{id}` |  |  |
+| POST | `/access/check` | Khi người dùng quẹt thẻ tại cổng | Trả về ALLOW hoặc DENY |
+| GET | `/policies/access/{policyId}` | Khi cần kiểm tra chi tiết policy | Trả về policy hợp lệ |
+| GET | `/decisions/{decisionId}` | Khi cần xem lịch sử quyết định | Trả về AccessDecision |
+| GET | `/health` | Khi monitoring hệ thống | Status `ok` |
 
 ---
 
@@ -36,25 +38,25 @@ Tối thiểu 5 case.
 | 400 | Request sai schema | Sửa payload/log lỗi |
 | 401 | Thiếu token | Refresh/cấu hình token |
 | 403 | Không đủ quyền | Báo lỗi quyền truy cập |
-| 404 | Không tìm thấy resource | Hiển thị trạng thái không tồn tại |
-| 409 | Xung đột nghiệp vụ | Retry hoặc yêu cầu thao tác lại |
-| 422 | Vi phạm rule nghiệp vụ | Hiển thị lý do cụ thể |
+| 404 | Không tìm thấy policy hoặc decision | Hiển thị trạng thái không tồn tại |
+| 409 | Duplicate request hoặc conflict | Retry hoặc yêu cầu thao tác lại |
+| 422 | Card bị khóa hoặc policy hết hạn | Hiển thị lý do cụ thể |
 
 ---
 
 ## 4. Giả định bổ sung
 
-- Giả định 1:
-- Giả định 2:
-- Giả định 3:
+- Giả định 1: Provider luôn trả response JSON đúng schema đã thống nhất.
+- Giả định 2: Response `/access/check` phải dưới 2 giây.
+- Giả định 3: Access Gate sử dụng UTC timezone để đồng bộ timestamp.
 
 ---
 
 ## 5. Câu hỏi cho Provider
 
-1. 
-2. 
-3. 
+1. Access decision được lưu trong hệ thống bao lâu?
+2. Khi Core Business timeout thì có retry tự động không?
+3. Có cần validate format cardId ở phía Consumer không?
 
 ---
 
@@ -64,3 +66,6 @@ Tối thiểu 5 case.
 |---|---|---|
 | Provider đổi kiểu dữ liệu | Consumer parse lỗi | Chốt type/format/pattern |
 | Provider thiếu mã lỗi | Consumer khó xử lý lỗi | Chuẩn hóa Problem Details |
+| Response quá chậm | Gate bị delay | Thống nhất timeout SLA |
+| Response thiếu field | Consumer xử lý sai | Bắt buộc required fields |
+| Khác timezone | Sai expiresAt | Chuẩn hóa UTC ISO 8601 |
